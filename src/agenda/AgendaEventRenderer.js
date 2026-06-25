@@ -15,6 +15,7 @@ function AgendaEventRenderer() {
 	var trigger = t.trigger;
 	var isEventDraggable = t.isEventDraggable;
 	var isEventResizable = t.isEventResizable;
+	var buildEventExtraAttrs = t.buildEventExtraAttrs;
 	var eventElementHandlers = t.eventElementHandlers;
 	var setHeight = t.setHeight;
 	var getDaySegmentContainer = t.getDaySegmentContainer;
@@ -312,10 +313,36 @@ function AgendaEventRenderer() {
 	}
 	
 	
+	function getSlotSegInnerHtml(event, seg) {
+		var contentFn = opt('eventContent');
+		var customHtml;
+
+		if ($.isFunction(contentFn)) {
+			customHtml = contentFn(event, seg, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		return (
+			"<div class='fc-event-inner'>" +
+			"<div class='fc-event-time'>" +
+			htmlEscape(t.getEventTimeText(event)) +
+			"</div>" +
+			"<div class='fc-event-title'>" +
+			htmlEscape(event.title || '') +
+			"</div>" +
+			"</div>"
+		);
+	}
+
+
 	function slotSegHtml(event, seg) {
 		var html = "<";
 		var url = event.url;
 		var skinCss = getSkinCss(event, opt);
+		var extra = buildEventExtraAttrs(event, seg);
 		var classes = ['fc-event', 'fc-event-vert'];
 		if (isEventDraggable(event)) {
 			classes.push('fc-event-draggable');
@@ -330,6 +357,7 @@ function AgendaEventRenderer() {
 		if (event.source) {
 			classes = classes.concat(event.source.className || []);
 		}
+		classes = classes.concat(extra.classes);
 		if (url) {
 			html += "a href='" + htmlEscape(event.url) + "'";
 		}else{
@@ -345,20 +373,15 @@ function AgendaEventRenderer() {
 				"left:" + seg.left + "px;" +
 				skinCss +
 				"'" +
+			extra.html +
 			">" +
-			"<div class='fc-event-inner'>" +
-			"<div class='fc-event-time'>" +
-			htmlEscape(t.getEventTimeText(event)) +
-			"</div>" +
-			"<div class='fc-event-title'>" +
-			htmlEscape(event.title || '') +
-			"</div>" +
-			"</div>" +
+			getSlotSegInnerHtml(event, seg) +
 			"<div class='fc-event-bg'></div>";
 
 		if (seg.isEnd && isEventResizable(event)) {
+			var handleStyle = event.color ? " style='color:" + htmlEscape(event.color) + "'" : '';
 			html +=
-				"<div class='ui-resizable-handle ui-resizable-s'>=</div>";
+				"<div class='ui-resizable-handle ui-resizable-s'" + handleStyle + ">=</div>";
 		}
 		html +=
 			"</" + (url ? "a" : "div") + ">";

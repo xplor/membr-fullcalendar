@@ -45,6 +45,31 @@ var defaults = {
 		week: generateWeekColumnFormat,
 		day: 'dddd' // like "Saturday"
 	},
+
+	// Custom template hooks. null per key = built-in for that view.
+	eventContent: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+	// eventOuterAttributes(event, seg, view) -> object of extra attributes for the outer .fc-event element.
+	// Keys become HTML attributes; 'class' is merged with FC's own classes.
+	// e.g. { id: 'event123', 'data-recurring': 'true', class: 'is-public' }
+	eventOuterAttributes: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+	columnHeaderContent: {
+		agendaWeek: null,
+		agendaDay: null
+	},
+	headerSectionRender: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+
 	timeFormat: { // for event elements
 		'default': generateShortTimeFormat
 	},
