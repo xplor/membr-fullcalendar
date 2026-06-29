@@ -40,6 +40,24 @@ function Header(calendar, options) {
 	}
 	
 	
+	function resolveHeaderOption(name) {
+		var v = options[name];
+		if ($.isPlainObject(v) && !isForcedAtomicOption(name)) {
+			var view = calendar.getView();
+			return smartProperty(v, view ? view.name : options.defaultView);
+		}
+		return v;
+	}
+
+
+	function invokeHeaderSectionRender(position, sectionEl) {
+		var fn = resolveHeaderOption('headerSectionRender');
+		if ($.isFunction(fn)) {
+			fn(position, sectionEl, calendar);
+		}
+	}
+
+
 	function renderSection(position) {
 		var e = $("<td class='fc-header-" + position + "'/>");
 		var buttonStr = options.header[position];
@@ -135,6 +153,7 @@ function Header(calendar, options) {
 				}
 			});
 		}
+		invokeHeaderSectionRender(position, e);
 		return e;
 	}
 	

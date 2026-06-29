@@ -329,6 +329,22 @@ function AgendaView(element, calendar, viewName) {
 	}
 
 
+	function getColumnHeaderHtml(date, col) {
+		var headerContentFn = opt('columnHeaderContent');
+		var customHtml;
+
+		if ($.isFunction(headerContentFn)) {
+			customHtml = headerContentFn(date, col, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		return htmlEscape(formatDate(date, colFormat));
+	}
+
+
 	function buildDayTableHeadHTML() {
 		var headerClass = tm + "-widget-header";
 		var date;
@@ -362,7 +378,7 @@ function AgendaView(element, calendar, viewName) {
 			date = cellToDate(0, col);
 			html +=
 				"<th class='fc-" + dayIDs[date.day()] + " fc-col" + col + ' ' + headerClass + "'>" +
-				htmlEscape(formatDate(date, colFormat)) +
+				getColumnHeaderHtml(date, col) +
 				"</th>";
 		}
 

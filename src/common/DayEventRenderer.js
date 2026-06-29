@@ -7,6 +7,7 @@ function DayEventRenderer() {
 	t.renderDayEvents = renderDayEvents;
 	t.draggableDayEvent = draggableDayEvent; // made public so that subclasses can override
 	t.resizableDayEvent = resizableDayEvent; // "
+	t.buildEventExtraAttrs = buildEventExtraAttrs;
 	
 	
 	// imports
@@ -229,6 +230,7 @@ function DayEventRenderer() {
 		var isRTL = opt('isRTL');
 		var event = segment.event;
 		var url = event.url;
+		var extra = buildEventExtraAttrs(event, segment);
 
 		// generate the list of CSS classNames
 		var classNames = [ 'fc-event', 'fc-event-hori' ];
@@ -248,6 +250,7 @@ function DayEventRenderer() {
 			// use the event's source's classNames, if specified
 			classNames = classNames.concat(event.source.className || []);
 		}
+		classNames = classNames.concat(extra.classes);
 
 		// generate a semicolon delimited CSS string for any of the "skin" properties
 		// of the event object (`backgroundColor`, `borderColor` and such)
@@ -266,19 +269,9 @@ function DayEventRenderer() {
 				"left:" + segment.left + "px;" +
 				skinCss +
 				"'" +
+			extra.html +
 			">" +
-			"<div class='fc-event-inner'>";
-		if (!event.allDay && segment.isStart) {
-			html +=
-				"<span class='fc-event-time'>" +
-				htmlEscape(t.getEventTimeText(event)) +
-				"</span>";
-		}
-		html +=
-			"<span class='fc-event-title'>" +
-			htmlEscape(event.title || '') +
-			"</span>" +
-			"</div>";
+			getDaySegInnerHtml(event, segment);
 		if (event.allDay && segment.isEnd && isEventResizable(event)) {
 			html +=
 				"<div class='ui-resizable-handle ui-resizable-" + (isRTL ? 'w' : 'e') + "'>" +
@@ -292,6 +285,56 @@ function DayEventRenderer() {
 		// even though their widths/heights are not set.
 		// SOLUTION: initially set them as visibility:hidden ?
 
+		return html;
+	}
+
+
+	function buildEventExtraAttrs(event, seg) {
+		var attrFn = opt('eventOuterAttributes');
+		if (!$.isFunction(attrFn)) {
+			return { classes: [], html: '' };
+		}
+		var attrs = attrFn(event, seg, t) || {};
+		var extraClasses = [];
+		var extraHtml = '';
+		$.each(attrs, function(key, val) {
+			if (val === null || val === undefined) { return; }
+			if (key === 'class') {
+				extraClasses = extraClasses.concat(
+					typeof val === 'string' ? val.split(/\s+/) : val
+				);
+			} else {
+				extraHtml += ' ' + htmlEscape(key) + '="' + htmlEscape(String(val)) + '"';
+			}
+		});
+		return { classes: extraClasses, html: extraHtml };
+	}
+
+
+	function getDaySegInnerHtml(event, segment) {
+		var contentFn = opt('eventContent');
+		var customHtml;
+
+		if ($.isFunction(contentFn)) {
+			customHtml = contentFn(event, segment, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		var html = "<div class='fc-event-inner'>";
+		if (!event.allDay && segment.isStart) {
+			html +=
+				"<span class='fc-event-time'>" +
+				htmlEscape(t.getEventTimeText(event)) +
+				"</span>";
+		}
+		html +=
+			"<span class='fc-event-title'>" +
+			htmlEscape(event.title || '') +
+			"</span>" +
+			"</div>";
 		return html;
 	}
 
