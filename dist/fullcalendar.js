@@ -1,7 +1,7 @@
 /*!
- * FullCalendar v2.0.3
- * Docs & License: http://arshaw.com/fullcalendar/
- * (c) 2013 Adam Shaw
+ * <%= meta.title %> v<%= meta.version %>
+ * Docs & License: <%= meta.homepage %>
+ * (c) <%= meta.copyright %>
  */
 
 (function(factory) {
@@ -61,6 +61,31 @@ var defaults = {
 		week: generateWeekColumnFormat,
 		day: 'dddd' // like "Saturday"
 	},
+
+	// Custom template hooks. null per key = built-in for that view.
+	eventContent: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+	// eventOuterAttributes(event, seg, view) -> object of extra attributes for the outer .fc-event element.
+	// Keys become HTML attributes; 'class' is merged with FC's own classes.
+	// e.g. { id: 'event123', 'data-recurring': 'true', class: 'is-public' }
+	eventOuterAttributes: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+	columnHeaderContent: {
+		agendaWeek: null,
+		agendaDay: null
+	},
+	headerSectionRender: {
+		agendaWeek: null,
+		agendaDay: null,
+		month: null
+	},
+
 	timeFormat: { // for event elements
 		'default': generateShortTimeFormat
 	},
@@ -166,7 +191,7 @@ var rtlDefaults = {
 
 ;;
 
-var fc = $.fullCalendar = { version: "2.0.3" };
+var fc = $.fullCalendar = { version: "<%= meta.version %>" };
 var fcViews = fc.views = {};
 
 
@@ -1131,6 +1156,24 @@ function Header(calendar, options) {
 	}
 	
 	
+	function resolveHeaderOption(name) {
+		var v = options[name];
+		if ($.isPlainObject(v) && !isForcedAtomicOption(name)) {
+			var view = calendar.getView();
+			return smartProperty(v, view ? view.name : options.defaultView);
+		}
+		return v;
+	}
+
+
+	function invokeHeaderSectionRender(position, sectionEl) {
+		var fn = resolveHeaderOption('headerSectionRender');
+		if ($.isFunction(fn)) {
+			fn(position, sectionEl, calendar);
+		}
+	}
+
+
 	function renderSection(position) {
 		var e = $("<td class='fc-header-" + position + "'/>");
 		var buttonStr = options.header[position];
@@ -1226,6 +1269,7 @@ function Header(calendar, options) {
 				}
 			});
 		}
+		invokeHeaderSectionRender(position, e);
 		return e;
 	}
 	
@@ -3944,6 +3988,22 @@ function AgendaView(element, calendar, viewName) {
 	}
 
 
+	function getColumnHeaderHtml(date, col) {
+		var headerContentFn = opt('columnHeaderContent');
+		var customHtml;
+
+		if ($.isFunction(headerContentFn)) {
+			customHtml = headerContentFn(date, col, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		return htmlEscape(formatDate(date, colFormat));
+	}
+
+
 	function buildDayTableHeadHTML() {
 		var headerClass = tm + "-widget-header";
 		var date;
@@ -3977,7 +4037,7 @@ function AgendaView(element, calendar, viewName) {
 			date = cellToDate(0, col);
 			html +=
 				"<th class='fc-" + dayIDs[date.day()] + " fc-col" + col + ' ' + headerClass + "'>" +
-				htmlEscape(formatDate(date, colFormat)) +
+				getColumnHeaderHtml(date, col) +
 				"</th>";
 		}
 
@@ -4589,6 +4649,7 @@ function AgendaEventRenderer() {
 	var trigger = t.trigger;
 	var isEventDraggable = t.isEventDraggable;
 	var isEventResizable = t.isEventResizable;
+	var buildEventExtraAttrs = t.buildEventExtraAttrs;
 	var eventElementHandlers = t.eventElementHandlers;
 	var setHeight = t.setHeight;
 	var getDaySegmentContainer = t.getDaySegmentContainer;
@@ -4886,10 +4947,36 @@ function AgendaEventRenderer() {
 	}
 	
 	
+	function getSlotSegInnerHtml(event, seg) {
+		var contentFn = opt('eventContent');
+		var customHtml;
+
+		if ($.isFunction(contentFn)) {
+			customHtml = contentFn(event, seg, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		return (
+			"<div class='fc-event-inner'>" +
+			"<div class='fc-event-time'>" +
+			htmlEscape(t.getEventTimeText(event)) +
+			"</div>" +
+			"<div class='fc-event-title'>" +
+			htmlEscape(event.title || '') +
+			"</div>" +
+			"</div>"
+		);
+	}
+
+
 	function slotSegHtml(event, seg) {
 		var html = "<";
 		var url = event.url;
 		var skinCss = getSkinCss(event, opt);
+		var extra = buildEventExtraAttrs(event, seg);
 		var classes = ['fc-event', 'fc-event-vert'];
 		if (isEventDraggable(event)) {
 			classes.push('fc-event-draggable');
@@ -4904,6 +4991,7 @@ function AgendaEventRenderer() {
 		if (event.source) {
 			classes = classes.concat(event.source.className || []);
 		}
+		classes = classes.concat(extra.classes);
 		if (url) {
 			html += "a href='" + htmlEscape(event.url) + "'";
 		}else{
@@ -4919,20 +5007,15 @@ function AgendaEventRenderer() {
 				"left:" + seg.left + "px;" +
 				skinCss +
 				"'" +
+			extra.html +
 			">" +
-			"<div class='fc-event-inner'>" +
-			"<div class='fc-event-time'>" +
-			htmlEscape(t.getEventTimeText(event)) +
-			"</div>" +
-			"<div class='fc-event-title'>" +
-			htmlEscape(event.title || '') +
-			"</div>" +
-			"</div>" +
+			getSlotSegInnerHtml(event, seg) +
 			"<div class='fc-event-bg'></div>";
 
 		if (seg.isEnd && isEventResizable(event)) {
+			var handleStyle = event.color ? " style='color:" + htmlEscape(event.color) + "'" : '';
 			html +=
-				"<div class='ui-resizable-handle ui-resizable-s'>=</div>";
+				"<div class='ui-resizable-handle ui-resizable-s'" + handleStyle + ">=</div>";
 		}
 		html +=
 			"</" + (url ? "a" : "div") + ">";
@@ -6035,6 +6118,7 @@ function DayEventRenderer() {
 	t.renderDayEvents = renderDayEvents;
 	t.draggableDayEvent = draggableDayEvent; // made public so that subclasses can override
 	t.resizableDayEvent = resizableDayEvent; // "
+	t.buildEventExtraAttrs = buildEventExtraAttrs;
 	
 	
 	// imports
@@ -6257,6 +6341,7 @@ function DayEventRenderer() {
 		var isRTL = opt('isRTL');
 		var event = segment.event;
 		var url = event.url;
+		var extra = buildEventExtraAttrs(event, segment);
 
 		// generate the list of CSS classNames
 		var classNames = [ 'fc-event', 'fc-event-hori' ];
@@ -6276,6 +6361,7 @@ function DayEventRenderer() {
 			// use the event's source's classNames, if specified
 			classNames = classNames.concat(event.source.className || []);
 		}
+		classNames = classNames.concat(extra.classes);
 
 		// generate a semicolon delimited CSS string for any of the "skin" properties
 		// of the event object (`backgroundColor`, `borderColor` and such)
@@ -6294,19 +6380,9 @@ function DayEventRenderer() {
 				"left:" + segment.left + "px;" +
 				skinCss +
 				"'" +
+			extra.html +
 			">" +
-			"<div class='fc-event-inner'>";
-		if (!event.allDay && segment.isStart) {
-			html +=
-				"<span class='fc-event-time'>" +
-				htmlEscape(t.getEventTimeText(event)) +
-				"</span>";
-		}
-		html +=
-			"<span class='fc-event-title'>" +
-			htmlEscape(event.title || '') +
-			"</span>" +
-			"</div>";
+			getDaySegInnerHtml(event, segment);
 		if (event.allDay && segment.isEnd && isEventResizable(event)) {
 			html +=
 				"<div class='ui-resizable-handle ui-resizable-" + (isRTL ? 'w' : 'e') + "'>" +
@@ -6320,6 +6396,56 @@ function DayEventRenderer() {
 		// even though their widths/heights are not set.
 		// SOLUTION: initially set them as visibility:hidden ?
 
+		return html;
+	}
+
+
+	function buildEventExtraAttrs(event, seg) {
+		var attrFn = opt('eventOuterAttributes');
+		if (!$.isFunction(attrFn)) {
+			return { classes: [], html: '' };
+		}
+		var attrs = attrFn(event, seg, t) || {};
+		var extraClasses = [];
+		var extraHtml = '';
+		$.each(attrs, function(key, val) {
+			if (val === null || val === undefined) { return; }
+			if (key === 'class') {
+				extraClasses = extraClasses.concat(
+					typeof val === 'string' ? val.split(/\s+/) : val
+				);
+			} else {
+				extraHtml += ' ' + htmlEscape(key) + '="' + htmlEscape(String(val)) + '"';
+			}
+		});
+		return { classes: extraClasses, html: extraHtml };
+	}
+
+
+	function getDaySegInnerHtml(event, segment) {
+		var contentFn = opt('eventContent');
+		var customHtml;
+
+		if ($.isFunction(contentFn)) {
+			customHtml = contentFn(event, segment, t, htmlEscape);
+		}
+
+		if (customHtml) {
+			return customHtml;
+		}
+
+		var html = "<div class='fc-event-inner'>";
+		if (!event.allDay && segment.isStart) {
+			html +=
+				"<span class='fc-event-time'>" +
+				htmlEscape(t.getEventTimeText(event)) +
+				"</span>";
+		}
+		html +=
+			"<span class='fc-event-title'>" +
+			htmlEscape(event.title || '') +
+			"</span>" +
+			"</div>";
 		return html;
 	}
 
